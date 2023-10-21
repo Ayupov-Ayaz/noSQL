@@ -21,3 +21,4 @@
 
 ## noSQL базы данных
 * [mongoDB](./mongo-db/mongo-db.md)
+* [cassandra](./cassandra/cassandra.md)
