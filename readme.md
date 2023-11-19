@@ -3,7 +3,8 @@
 ## Теория
 * [cap](./theory/cap.md)
 ## Реляционные базы данных
+* [mssql](sql/mssql/mssql.md)
 
 ## noSQL базы данных
-* [mongoDB](./mongo-db/mongo-db.md)
-* [cassandra](./cassandra/cassandra.md)
+* [mongoDB](noSQL/mongo-db/mongo-db.md)
+* [cassandra](noSQL/cassandra/cassandra.md)
