@@ -43,12 +43,17 @@ INSERT INTO store.orders (id, product_id, phone, address, date) VALUES (2, 8, '+
 INSERT INTO store.orders (id, product_id, phone, address, date) VALUES (3, 7, '+380541264567', 'Пушкина дом 3 кв 4 ', '2020-01-02 00:00:00');
 INSERT INTO store.orders (id, product_id, phone, address, date) VALUES (4, 5, '+380501234567', 'Проспект Победы дом 10 кв 2', '2020-01-03 00:00:00');
 INSERT INTO store.orders (id, product_id, phone, address, date) VALUES (5, 1, '+380501284567', 'Риххарда Зорге дом 23 кв 712', '2020-01-01 00:00:00');
-INSERT INTO store.orders (id, product_id, phone, address, date) VALUES (6, 2, '+380501234567', 'Маркса дом 2 кв 33', '2020-01-02 00:00:00');
+INSERT INTO store.orders (id, product_id, phone, address, date) VALUES (6, 2, '+380501234567', 'Проспект Победы дом 10 кв 2', '2020-01-02 00:00:00');
 INSERT INTO store.orders (id, product_id, phone, address, date) VALUES (7, 4, '+340501244567', 'Ершова дом 5, корп. 3, кв 23', '2020-01-04 00:00:00');
-INSERT INTO store.orders (id, product_id, phone, address, date) VALUES (8, 3, '+380501234567', 'Набережная дом 23 кв 32', '2020-01-05 00:00:00');
+INSERT INTO store.orders (id, product_id, phone, address, date) VALUES (8, 3, '+380501234567', 'Проспект Победы дом 10 кв 2', '2020-01-05 00:00:00');
 INSERT INTO store.orders (id, product_id, phone, address, date) VALUES (9, 1, '+340501244567', 'Ершова дом 5, корп. 3, кв 23', '2020-01-06 00:00:00');
 
 -- Select data from products table
 SELECT name, price FROM store.products WHERE id = 1 and name = 'Apple';
 SELECT name, price, description FROM store.products WHERE price > 5.0 ALLOW FILTERING;
 SELECT * FROM store.orders WHERE date < '2020-01-02 00:00:00' ALLOW FILTERING;
+
+-- Create second index
+CREATE INDEX IF NOT EXISTS ON  store.orders (phone);
+-- Select data from orders table with index
+SELECT id, product_id, address  FROM store.orders WHERE phone = '+380501234567';
