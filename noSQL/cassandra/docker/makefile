@@ -3,6 +3,7 @@ arch ?= arm64v8
 version ?= 5.0
 port ?= 9042
 name ?= cassandra-test
+host ?= localhost
 
 create-network:
 	docker network create $(network)
@@ -46,3 +47,14 @@ run-cassandra-clusters:
 	--name $(name)-3 \
 	-e CASSANDRA_SEEDS="$(name)-1,$(name)-2,$(name)-3" \
 	$(arch)/cassandra:$(version)
+
+run-stress-tool:
+	docker run --rm -it \
+	chrisbelyea/cassandra-stress:latest \
+  	-node $(host) \
+  	-port $(port) \
+  	-schema keyspace="store" \
+  	-schema replication\(strategy=NetworkTopologyStrategy, factor=2\) \
+	-pop seq=1..1000000 \
+	-rate threads=50
+
