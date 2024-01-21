@@ -42,6 +42,7 @@ run-cassandra-clusters:
 	docker run --rm -d \
 	--network cassandra-network \
 	--name cassandra-1 \
+	-v ./data-cassandra-1:/var/lib/cassandra/data \
 	-e CASSANDRA_SEEDS="cassandra-1,cassandra-2,cassandra-3" \
 	arm64v8/cassandra:5.0
 
@@ -199,7 +200,7 @@ result:
 
 проверяем, что индекс создался
 ```cassandraql
-    SELECT id, product_id, address, prone  FROM store.orders WHERE phone = '+380501234567';
+    SELECT id, product_id, address, phone  FROM store.orders WHERE phone = '+380501234567';
 ```
 
 result:
@@ -210,3 +211,203 @@ result:
 | 6   | 2          | Проспект Победы дом 10 кв 2 | +380501234567 |
 | 8   | 3          | Проспект Победы дом 10 кв 2 | +380501234567 |
 
+
+# Создание snapshots
+
+> Для ручного управления snapshot-ами используется nodetool
+> nodetool - это инструмент командной строки, который позволяет управлять кластером Cassandra.
+> Чтобы создать ручные snapshot-ы, нужно установить параметр 
+> auto_snapshot в значение false в файле cassandra.yaml.
+
+* Создать snapshot всех данных в keyspace store
+
+```bash
+    docker exec -it cassandra-1 nodetool snapshot -t store
+```
+
+* чтобы посмотреть список снапшотов
+
+```bash
+    docker exec -it cassandra-1 nodetool listsnapshots;
+```
+
+* чтобы удалить все снапшоты
+
+```bash
+    docker exec -it cassandra-1 nodetool clearsnapshot --all
+```
+
+* чтобы удалить конкретный снапшот
+
+```bash
+    docker exec -it cassandra-1 nodetool clearsnapshot -t store
+```
+
+* Cоздать snapshot определенной таблицы в keyspace store
+
+```bash
+    docker exec -it cassandra-1 nodetool snapshot -t store.orders
+```
+
+* Удаление всех данных
+
+```cassandraql
+    DROP KEYSPACE store;
+```
+
+## Backup
+
+> Для создание инкрементных backup-ов нужно установить incremental_backups 
+> в значение true в файле cassandra.yaml.
+
+> Это единственная настройка, необходимая для создания инкрементных 
+> резервных копий. По умолчанию настройка incremental_backups установлена на false, 
+> потому что для каждого сброса данных создается новый набор файлов SSTable,
+> и если необходимо запустить несколько инструкций CQL, 
+> каталог резервных копий может быстро заполниться и использовать хранилище, 
+> необходимое для хранения данных таблицы. Инкрементное резервное копирование 
+> также может быть включено в командной строке с помощью команды nodetool nodetool enablebackup.
+> Инкрементное резервное копирование может быть отключено с помощью команды nodetool disablebackup.
+> Статус инкрементных резервных копий, включены ли они, можно проверить с помощью nodetool statusbackup
+[источник](https://cassandra.apache.org/doc/stable/cassandra/operating/backups.html)
+
+# Restore
+
+В качестве примера мы попробуем восстановить все удаленные данные из snapshot-а
+Раннее, как можно заметить контейнер cassandra-1 имеет volume, который проброшен
+в папку data-cassandra-1. В этой папке хранятся все данные, которые были записаны
+в cassandra-1. Поэтому, чтобы восстановить данные, нужно просто скопировать
+все данные из snapshot-а в папку с keyspace store.
+
+Для начала давайте посмотрим список наших файлов в data-cassandra-1: 
+    
+```bash
+    tree ./data-cassandra-1/store
+```
+
+вывод: 
+
+```
+./data-cassandra-1/store </br>
+├── orders-f897bcb0aca111eea2714d9710d14fc9 </br>
+│   ├── backups </br>
+│   ├── nc-1-big-CompressionInfo.db </br>
+│   ├── nc-1-big-Data.db </br>
+│   ├── nc-1-big-Digest.crc32 </br>
+│   ├── nc-1-big-Filter.db </br>
+│   ├── nc-1-big-Index.db </br>
+│   ├── nc-1-big-Statistics.db </br>
+│   ├── nc-1-big-Summary.db </br>
+│   └── nc-1-big-TOC.txt </br>
+└── products-f4ff2ca0aca111eea2714d9710d14fc9 </br>
+│   ├── backups </br>
+│   ├── nc-1-big-CompressionInfo.db </br>
+│   ├── nc-1-big-Data.db </br>
+│   ├── nc-1-big-Digest.crc32 </br>
+│   ├── nc-1-big-Filter.db </br>
+│   ├── nc-1-big-Index.db </br>
+│   ├── nc-1-big-Statistics.db </br>
+│   ├── nc-1-big-Summary.db </br>
+│   └── nc-1-big-TOC.txt </br>
+```
+
+все эти файлы были созданы cassandra-1, когда мы записывали данные в таблицы.
+Если вызвать команду 
+
+```bash
+  docker exec -it cassandra-1 nodetool snapshot -t store
+```
+
+вывод программы будет следующим:
+
+```
+  Requested creating snapshot(s) for [all keyspaces] with snapshot name [store] and options {skipFlush=false}
+  Snapshot directory: store
+```
+
+После этой команды в нашей дирректории с файлами появится папка snapshots
+в которой будут храниться все снапшоты. В нашем случае это папка store.
+
+вот так выглядит snapshot таблицы products:
+
+```bash
+  tree ./data-cassandra-1/store/products-f4ff2ca0aca111eea2714d9710d14fc9/snapshots/store
+```
+
+вывод:
+
+```
+./data-cassandra-1/store/products-f4ff2ca0aca111eea2714d9710d14fc9/snapshots/store
+├── manifest.json
+├── nc-1-big-CompressionInfo.db
+├── nc-1-big-Data.db
+├── nc-1-big-Digest.crc32
+├── nc-1-big-Filter.db
+├── nc-1-big-Index.db
+├── nc-1-big-Statistics.db
+├── nc-1-big-Summary.db
+├── nc-1-big-TOC.txt
+└── schema.cql
+```
+
+давайте теперь удалим все данные из таблицы products
+
+```cassandraql
+  TRUNCATE store.products;
+```
+
+проверяем, что данные удалились
+
+```cassandraql
+  SELECT * FROM store.products;
+```
+
+вывод:
+
+```
+  id | name | description | price
+  ----+------+-------------+-------
+  (0 rows)
+```
+
+теперь давайте скопируем все данные из snapshot-а в папку с таблицей products
+
+```bash
+  cp -r ./data-cassandra-1/store/products-f4ff2ca0aca111eea2714d9710d14fc9/snapshots/store/* ./data-cassandra-1/store/products-f4ff2ca0aca111eea2714d9710d14fc9/
+```
+
+затем, чтобы cassandra подхватила изменения, нужно выполнить refresh
+
+```bash
+    docker exec -it cassandra-1 nodetool refresh store products
+```
+
+теперь давайте проверим, что данные восстановились
+
+```cassandraql
+  SELECT * FROM store.products;
+```
+
+вывод программы: 
+
+| id | name  |  price | description |
+|----|-------|--------|-------------|
+| 4  |  Pineapple |   4.5 |  Yellow pineapple
+| 11 |     Cherry |  11.5 |        Red cherry
+| 3  |     Banana |   3.5 |     Yellow banana
+| 1  |      Apple |   1.5 |       Green apple
+| 10 |       Pear |  10.5 |       Yellow pear
+| 7  |      Lemon |   7.5 |      Yellow lemon
+| 9  |      Peach |   9.5 |      Yellow peach
+| 6  |       Kiwi |   6.5 |        Green kiwi
+| 2  |     Orange |   2.5 |     Orange orange
+| 8  | Grapefruit |   8.5 | Yellow grapefruit
+| 5  |      Mango |   5.5 |      Yellow mango
+
+Подводные камни:
+1) Важно понимать, что это процесс возвращения данных к моменту создания snapshot-а.
+   Если вам нужно восстановить данные к определенному моменту времени, то нужно
+   создать snapshot в этот момент времени, что довольно таки сложно. 
+2) Перед тем как делать restore, нужно убедиться, что схема таблиц в snapshot-e и в cassandra
+   совпадают. Иначе, при restore, cassandra выдаст ошибку.
+3) Такой подход выглядит не очень безопасным, так как мы просто копируем данные из одной папки в другую.
